@@ -8,7 +8,6 @@ library(stringr)
 
 ## Log into Twitter (if anyone but me uses this please be respectful of my login details)
 
-setup_twitter_oauth("ODFVhF2Oi4PZqSYHjdvtCqba4", "d2KIA9QOAO6dpmBrsDSROoNaI6P6hqZuGalv4cmZGi9PQXbQz1", 	"1076364853-vvbIANeFlLwJh7IbhOxCHrrDNTKpE9LRUibV00j", "E7TA7Mv3mh05A7hWp5Zu0zrMZEpANgzIdiPJoNM5hf8YI")
 
 
 #Search through defined search terms - make sure that all words are joined by a +
