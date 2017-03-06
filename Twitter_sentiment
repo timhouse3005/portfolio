@@ -1,0 +1,152 @@
+## Set up the required packages
+
+library(tm)
+library(wordcloud)
+library(twitteR)
+library(plyr)
+library(stringr)
+
+## Log into Twitter (if anyone but me uses this please be respectful of my login details)
+
+setup_twitter_oauth("ODFVhF2Oi4PZqSYHjdvtCqba4", "d2KIA9QOAO6dpmBrsDSROoNaI6P6hqZuGalv4cmZGi9PQXbQz1", 	"1076364853-vvbIANeFlLwJh7IbhOxCHrrDNTKpE9LRUibV00j", "E7TA7Mv3mh05A7hWp5Zu0zrMZEpANgzIdiPJoNM5hf8YI")
+
+
+#Search through defined search terms - make sure that all words are joined by a +
+#search terms are stored on file in the dropbox
+
+search1 <- twListToDF(searchTwitter("Bill+Shorten", n=100, since=as.character(Sys.Date()-5)))
+search2 <- twListToDF(searchTwitter("Tanya+Plibersek", n=100, since=as.character(Sys.Date()-5)))
+search3 <- twListToDF(searchTwitter("Penny+Wong", n=100, since=as.character(Sys.Date()-5)))
+search4 <- twListToDF(searchTwitter("Stephen+Conroy", n=100, since=as.character(Sys.Date()-5)))
+search5 <- twListToDF(searchTwitter("Chris+Bowen ", n=100, since=as.character(Sys.Date()-5)))
+search6 <- twListToDF(searchTwitter("Michelle+Rowland ", n=100, since=as.character(Sys.Date()-5)))
+search7 <- twListToDF(searchTwitter("Tony+Burke", n=100, since=as.character(Sys.Date()-5)))
+search8 <- twListToDF(searchTwitter("Mark+Dreyfus", n=100, since=as.character(Sys.Date()-5)))
+search9 <- twListToDF(searchTwitter("Kim+Carr", n=100, since=as.character(Sys.Date()-5)))
+search10 <- twListToDF(searchTwitter("Anthony+Albanese", n=100, since=as.character(Sys.Date()-5)))
+search11 <- twListToDF(searchTwitter("Katy+Gallagher", n=100, since=as.character(Sys.Date()-5)))
+search12 <- twListToDF(searchTwitter("Mark+Butler", n=100, since=as.character(Sys.Date()-5)))
+search13 <- twListToDF(searchTwitter("Jason+Clare", n=100, since=as.character(Sys.Date()-5)))
+search14 <- twListToDF(searchTwitter("Kate+Ellis", n=100, since=as.character(Sys.Date()-5)))
+search15 <- twListToDF(searchTwitter("Joel+Fitzgibbon", n=100, since=as.character(Sys.Date()-5)))
+search17 <- twListToDF(searchTwitter("Catherine+King", n=100, since=as.character(Sys.Date()-5)))
+search18 <- twListToDF(searchTwitter("Jenny+Macklin", n=100, since=as.character(Sys.Date()-5)))
+search19 <- twListToDF(searchTwitter("Richard+Marles", n=100, since=as.character(Sys.Date()-5)))
+search20 <- twListToDF(searchTwitter("Shayne+Neumann", n=100, since=as.character(Sys.Date()-5)))
+search21 <- twListToDF(searchTwitter("Brendan+O'Connor", n=100, since=as.character(Sys.Date()-5)))
+search22 <- twListToDF(searchTwitter("Labor", n=100, since=as.character(Sys.Date()-5)))
+search23 <- twListToDF(searchTwitter("Labor+Party", n=100, since=as.character(Sys.Date()-5)))
+search24 <- twListToDF(searchTwitter("ALP", n=100, since=as.character(Sys.Date()-5)))
+search25 <- twListToDF(searchTwitter("Australian+Labor+Party", n=100, since=as.character(Sys.Date()-5)))
+search26 <- twListToDF(searchTwitter("Australian+Labor", n=100, since=as.character(Sys.Date()-5)))
+
+tweet.df <- rbind(search1, search2, search2, search3, search4, search5, search6, search7, search8, search9, search10, search11, search12, search13, search14, search15, search17, search18, search19, search20, search21, search22, search23, search24, search25, search26)   
+
+
+## n is the number of tweets returned - Twitter will block too many
+## attempts and the package will retry until it can get the data up to the specified number of times. 
+#back it up
+
+write.csv(tweet.df, "C:/Users/Tim/Dropbox/R Files/tweetdf1.csv") #back it up
+
+## Cleaning up tweet text
+
+#tweet_text = sapply(tweet.df, function(x) x$getText())
+
+tweet_text <- as.list(tweet.df$text)
+
+tweet_text = gsub('http\\S+\\s*', '', tweet_text) ## Remove URLs
+tweet_text = gsub('\\b+RT', '', tweet_text) ## Remove RT
+tweet_text = gsub('#\\S+', '', tweet_text) ## Remove Hashtags
+tweet_text = gsub('@\\S+', '', tweet_text) ## Remove Mentions
+tweet_text = gsub('[[:cntrl:]]', '', tweet_text) ## Remove Controls and special characters
+tweet_text = gsub("\\d", '', tweet_text) ## Remove Controls and special characters
+tweet_text = gsub('[[:punct:]]', '', tweet_text) ## Remove Punctuations
+tweet_text = gsub("^[[:space:]]*","",tweet_text) ## Remove leading whitespaces
+tweet_text = gsub("[[:space:]]*$","",tweet_text) ## Remove trailing whitespaces
+tweet_text = gsub(' +',' ',tweet_text) ## Remove extra whitespaces
+
+## This section creates a wordcloud around the key terms searched for above
+
+# Wordcloud construction
+
+tweet_corpus = Corpus(VectorSource(tweet_text))
+
+tdm = TermDocumentMatrix(
+  tweet_corpus,
+  control = list(
+    removePunctuation = TRUE,
+    stopwords = c("Bill Shorten", stopwords("english")),
+    removeNumbers = TRUE, tolower = TRUE)
+)
+
+m = as.matrix(tdm)
+# get word counts in decreasing order
+word_freqs = sort(rowSums(m), decreasing = TRUE) 
+# create a data frame with words and their frequencies
+dm = data.frame(word = names(word_freqs), freq = word_freqs)
+
+wordcloud(dm$word, dm$freq, random.order = FALSE, colors = brewer.pal(8, "Dark2"))
+
+## This section sets up a function for a sentiment score to be used in a positive-negative sentiment analysis.
+
+score.sentiment = function(sentences, pos.words, neg.words)
+{
+  
+  scores = lapply(sentences, function(sentence, pos.words, neg.words, progress = 'none') {
+    
+    # clean up sentences with R's regex-driven global substitute, gsub():
+    sentence = gsub('[[:punct:]]', '', sentence)
+    sentence = gsub('[[:cntrl:]]', '', sentence)
+    sentence = gsub('\\d+', '', sentence)
+    # and convert to lower case:
+    sentence = tolower(sentence)
+    
+    # split into words. str_split is in the stringr package
+    word.list = str_split(sentence, '\\s+')
+    # sometimes a list() is one level of hierarchy too much
+    words = unlist(word.list)
+    
+    # compare our words to the dictionaries of positive & negative terms
+    pos.matches = match(words, pos.words)
+    neg.matches = match(words, neg.words)
+    
+    # match() returns the position of the matched term or NA
+    # we just want a TRUE/FALSE:
+    pos.matches = !is.na(pos.matches)
+    neg.matches = !is.na(neg.matches)
+    
+    # and conveniently enough, TRUE/FALSE will be treated as 1/0 by sum():
+    score = sum(pos.matches) - sum(neg.matches)
+    
+    return(score)
+  }, pos.words, neg.words, progress=progress)
+  
+  scores.df = data.frame(score=scores, text=sentences)
+  return(scores.df)
+}
+
+## Run the sentiment analysis 
+
+pos.words <- read.csv("C:/Users/Tim/Dropbox/R Files/Twitter sentiment files/positive.txt", sep="")
+neg.words <- read.csv("C:/Users/Tim/Dropbox/R Files/Twitter sentiment files/negative.txt", sep="")
+
+score.test <- score.sentiment(test_text, pos.words, neg.words)
+
+
+test_text = gsub('[[:punct:]]', '', test_text)
+test_text = gsub('[[:cntrl:]]', '', test_text)
+test_text  = gsub('\\d+', '', test_text)
+test_text  = tolower(test_text )
+
+word.list = str_split(tweet_text, '\\s+')
+words = unlist(word.list)
+write.csv(words, "C:/Users/Tim/Dropbox/R Files/tweetdf1.csv")
+
+pos.matches = match(words, pos.words)
+neg.matches = match(words, neg.words)
+
+## to pull out words for analysis on the pos and neg list
+
+test <- strsplit(tweet_text, " ")
+
